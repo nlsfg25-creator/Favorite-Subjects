@@ -1,0 +1,699 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Skill Battle Arena</title>
+    <style>
+        :root {
+            --blue-team: #3498db;
+            --red-team: #e74c3c;
+            --gold: #f1c40f;
+            --dark: #2c3e50;
+            --white: #ecf0f1;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            font-family: 'Arial Black', 'Segoe UI', sans-serif;
+            font-weight: bold; /* Global Bold */
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #000;
+        }
+
+        /* Screen Management */
+        .screen {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background-size: cover;
+            background-position: center;
+            transition: opacity 0.5s;
+        }
+
+        .active { display: flex; }
+
+        /* Backgrounds */
+        #home-screen { background-image: url('home_bg.png'); }
+        #battle-screen { background-image: url('battle_bg.png'); }
+        #victory-screen { background-image: url('victory_bg.png'); }
+        .overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0,0,0,0.3);
+            z-index: 0;
+        }
+
+        .content { position: relative; z-index: 1; text-align: center; color: white; width: 90%; max-width: 1200px; }
+
+        /* Typography */
+        h1 { font-size: 5.5rem; text-shadow: 6px 6px 0px #000; margin-bottom: 20px; color: var(--gold); }
+        h2 { font-size: 2.8rem; text-shadow: 3px 3px 0px #000; }
+
+        /* Buttons */
+        .btn {
+            padding: 18px 45px;
+            font-size: 1.8rem;
+            cursor: pointer;
+            border: 5px solid var(--white);
+            border-radius: 20px;
+            margin: 12px;
+            transition: transform 0.2s, background 0.2s;
+            background: var(--dark);
+            color: white;
+            box-shadow: 0 8px 0 rgba(0,0,0,0.5);
+            text-transform: uppercase;
+        }
+        .btn:hover { transform: scale(1.05); }
+        .btn:active { transform: translateY(4px); box-shadow: 0 2px 0 rgba(0,0,0,0.4); }
+        .btn-gold { background: var(--gold); color: var(--dark); border-color: var(--dark); }
+
+        /* Team Setup */
+        .setup-container {
+            background: rgba(0,0,0,0.85);
+            padding: 40px;
+            border-radius: 30px;
+            border: 4px solid var(--white);
+        }
+        .team-input-group { margin: 20px 0; }
+        .team-input-group label { display: block; font-size: 1.5rem; margin-bottom: 10px; color: var(--gold); }
+        .team-input-group input { 
+            padding: 12px; 
+            font-size: 1.5rem; 
+            border-radius: 12px; 
+            border: none;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        /* Battle HUD */
+        .hud {
+            position: absolute;
+            top: 20px;
+            width: 95%;
+            display: flex;
+            justify-content: space-between;
+            z-index: 2;
+        }
+        .team-stats {
+            width: 350px;
+            background: rgba(0,0,0,0.8);
+            padding: 20px;
+            border-radius: 20px;
+            border: 4px solid var(--white);
+            color: white;
+        }
+        .bar-container {
+            width: 100%;
+            height: 30px;
+            background: #222;
+            border-radius: 15px;
+            margin: 10px 0;
+            overflow: hidden;
+            border: 2px solid #000;
+            position: relative;
+        }
+        .bar-fill {
+            height: 100%;
+            width: 100%;
+            transition: width 0.4s ease-out;
+        }
+        .hp-fill { background: linear-gradient(to bottom, #2ecc71, #27ae60); }
+        .energy-fill { background: linear-gradient(to bottom, #f1c40f, #f39c12); }
+        .bar-text {
+            position: absolute;
+            width: 100%;
+            text-align: center;
+            font-size: 1.1rem;
+            color: white;
+            line-height: 30px;
+            text-shadow: 1px 1px 2px #000;
+        }
+        .score-text { font-size: 1.4rem; color: var(--gold); margin-top: 5px; }
+
+        /* Arena & Characters */
+        .arena {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            width: 100%;
+            height: 65%;
+            padding: 0 10%;
+            position: relative;
+        }
+        .hero-wrap { position: relative; transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .hero { width: 320px; display: block; }
+        
+        /* Attack Animations */
+        .attack-left-dash { transform: translateX(calc(100vw - 750px)); z-index: 50; }
+        .attack-right-dash { transform: translateX(calc(-100vw + 750px)); z-index: 50; }
+        
+        .hero.hit { animation: shake 0.5s; filter: brightness(2) saturate(2) sepia(1) hue-rotate(-50deg); }
+
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            10% { transform: translate(-5px, -5px) rotate(-2deg); }
+            20% { transform: translate(-10px, 0px) rotate(2deg); }
+            30% { transform: translate(10px, 5px) rotate(0deg); }
+            40% { transform: translate(5px, -5px) rotate(2deg); }
+            50% { transform: translate(-5px, 5px) rotate(-2deg); }
+            100% { transform: translate(0, 0) rotate(0deg); }
+        }
+
+        /* Question Box */
+        #question-overlay {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 92%;
+            max-width: 1000px;
+            background: rgba(255,255,255,0.98);
+            border: 6px solid var(--dark);
+            border-radius: 30px;
+            padding: 25px;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            box-shadow: 0 0 50px rgba(0,0,0,0.6);
+            color: #111;
+            z-index: 100;
+        }
+        .question-img { max-height: 250px; margin-bottom: 20px; border-radius: 15px; border: 4px solid var(--dark); }
+        .choices-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            width: 100%;
+        }
+        .choice-btn {
+            padding: 20px;
+            font-size: 1.6rem;
+            background: var(--dark);
+            color: white;
+            border: none;
+            border-radius: 15px;
+            cursor: pointer;
+            box-shadow: 0 5px 0 #000;
+            transition: 0.1s;
+        }
+        .choice-btn:hover { background: #3d566e; transform: scale(1.02); }
+        .choice-btn:active { transform: translateY(3px); box-shadow: 0 2px 0 #000; }
+        .img-choice { width: 140px; height: 140px; object-fit: contain; background: white; border: 3px solid #ccc; border-radius: 15px; }
+
+        /* Skills UI */
+        .skills-container {
+            position: absolute;
+            bottom: 30px;
+            display: flex;
+            gap: 25px;
+            background: rgba(0,0,0,0.8);
+            padding: 25px 40px;
+            border-radius: 60px;
+            border: 3px solid var(--white);
+        }
+        .skill-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+            transition: 0.2s;
+            color: white;
+            width: 120px;
+        }
+        .skill-btn span { font-size: 1.1rem; text-shadow: 1px 1px 2px #000; margin-top: 8px; }
+        .skill-btn:hover { transform: translateY(-15px); }
+        .skill-btn.disabled { opacity: 0.2; cursor: not-allowed; filter: grayscale(1); }
+        .skill-icon { width: 85px; height: 85px; border-radius: 50%; border: 4px solid var(--white); background: #333; box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
+
+        /* HUD Announcers */
+        #turn-announcer {
+            position: absolute;
+            top: 45%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 5rem;
+            color: white;
+            text-shadow: 5px 5px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000;
+            pointer-events: none;
+            opacity: 0;
+            z-index: 200;
+            width: 100%;
+            text-align: center;
+        }
+        .fade-in-out { animation: fadeInOut 1.5s forwards; }
+        @keyframes fadeInOut {
+            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+            20% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
+            80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+        }
+
+        #feedback-text {
+            position: absolute;
+            top: 30%;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            font-size: 5rem;
+            color: var(--gold);
+            text-shadow: 5px 5px 0 #000;
+            z-index: 201;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .volume-control {
+            position: absolute;
+            top: 25px;
+            right: 25px;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Audio Elements -->
+    <audio id="music-bg" src="snd_bgmusic.mp3" loop></audio>
+    <audio id="sfx-click" src="snd_click.mp3"></audio>
+    <audio id="sfx-correct" src="snd_correct.mp3"></audio>
+    <audio id="sfx-wrong" src="snd_wrong.mp3"></audio>
+    <audio id="sfx-attack" src="snd_attack.mp3"></audio>
+    <audio id="sfx-freeze" src="snd_freeze.mp3"></audio>
+    <audio id="sfx-ultimate" src="snd_ultimate.mp3"></audio>
+    <audio id="sfx-victory" src="snd_victory.mp3"></audio>
+
+    <div class="volume-control">
+        <button class="btn" id="mute-toggle" onclick="toggleMute()">🔊 Sound: ON</button>
+    </div>
+
+    <!-- Home Screen -->
+    <div id="home-screen" class="screen active">
+        <div class="overlay"></div>
+        <div class="content">
+            <h1>SKILL BATTLE ARENA</h1>
+            <button class="btn btn-gold" onclick="startGame()">START BATTLE</button>
+            <button class="btn" onclick="showScreen('setup-screen')">TEAM SETUP</button>
+            <button class="btn" onclick="showScreen('how-to-screen')">HOW TO PLAY</button>
+        </div>
+    </div>
+
+    <!-- How To Play -->
+    <div id="how-to-screen" class="screen">
+        <div class="overlay"></div>
+        <div class="content">
+            <h2>HOW TO PLAY</h2>
+            <div style="font-size: 1.8rem; background: rgba(0,0,0,0.8); padding: 30px; border-radius: 20px; margin: 25px 0; line-height: 1.6; border: 3px solid var(--gold);">
+                1. Pick a skill on your turn.<br>
+                2. Answer the English question.<br>
+                3. Correct = <span style="color:var(--gold)">ATTACK</span> opponent!<br>
+                4. Wrong = <span style="color:#aaa">MISS</span> and lose turn.<br>
+                5. Get 100 Energy for <span style="color:var(--red-team)">ULTIMATE!</span>
+            </div>
+            <button class="btn btn-gold" onclick="showScreen('home-screen')">BACK</button>
+        </div>
+    </div>
+
+    <!-- Setup Screen -->
+    <div id="setup-screen" class="screen">
+        <div class="overlay"></div>
+        <div class="content">
+            <div class="setup-container">
+                <h2>TEAM SETUP</h2>
+                <div class="team-input-group">
+                    <label>Team 1 Name (Left):</label>
+                    <input type="text" id="t1-name-input" value="Team Blue" maxlength="15">
+                </div>
+                <div class="team-input-group">
+                    <label>Team 2 Name (Right):</label>
+                    <input type="text" id="t2-name-input" value="Team Red" maxlength="15">
+                </div>
+                <button class="btn btn-gold" onclick="saveTeams()">SAVE & BACK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Battle Screen -->
+    <div id="battle-screen" class="screen">
+        <div class="hud">
+            <div class="team-stats" id="hud-left">
+                <h2 id="t1-name-display" style="color:var(--blue-team)">Team Blue</h2>
+                <div class="score-text">SCORE: <span id="t1-score">0</span></div>
+                <div style="margin-top:10px">HP</div>
+                <div class="bar-container">
+                    <div id="t1-hp-bar" class="bar-fill hp-fill"></div>
+                    <div class="bar-text"><span id="t1-hp-val">100</span>/100</div>
+                </div>
+                <div>ENERGY</div>
+                <div class="bar-container">
+                    <div id="t1-en-bar" class="bar-fill energy-fill" style="width:0%"></div>
+                    <div class="bar-text"><span id="t1-en-val">0</span>/100</div>
+                </div>
+            </div>
+
+            <div class="team-stats" id="hud-right">
+                <h2 id="t2-name-display" style="color:var(--red-team)">Team Red</h2>
+                <div class="score-text">SCORE: <span id="t2-score">0</span></div>
+                <div style="margin-top:10px">HP</div>
+                <div class="bar-container">
+                    <div id="t2-hp-bar" class="bar-fill hp-fill"></div>
+                    <div class="bar-text"><span id="t2-hp-val">100</span>/100</div>
+                </div>
+                <div>ENERGY</div>
+                <div class="bar-container">
+                    <div id="t2-en-bar" class="bar-fill energy-fill" style="width:0%"></div>
+                    <div class="bar-text"><span id="t2-en-val">0</span>/100</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="turn-announcer">TEAM BLUE TURN</div>
+        <div id="feedback-text"></div>
+
+        <div class="arena">
+            <div id="hero-wrap-left" class="hero-wrap">
+                <img src="hero_left.png" id="hero-left" class="hero">
+            </div>
+            <div id="hero-wrap-right" class="hero-wrap">
+                <img src="hero_right.png" id="hero-right" class="hero">
+            </div>
+        </div>
+
+        <div class="skills-container" id="skills-menu">
+            <div class="skill-btn" onclick="selectSkill('quick')">
+                <img src="icon_quick_strike.png" class="skill-icon">
+                <span>Quick Strike</span>
+            </div>
+            <div class="skill-btn" onclick="selectSkill('power')">
+                <img src="icon_power_blast.png" class="skill-icon">
+                <span>Power Blast</span>
+            </div>
+            <div class="skill-btn" onclick="selectSkill('freeze')">
+                <img src="icon_freeze_trap.png" class="skill-icon">
+                <span>Freeze Trap</span>
+            </div>
+            <div id="btn-ultimate" class="skill-btn disabled" onclick="selectSkill('ultimate')">
+                <img src="icon_ultimate.png" class="skill-icon">
+                <span style="color:var(--gold)">ULTIMATE</span>
+            </div>
+        </div>
+
+        <div id="question-overlay">
+            <h3 id="q-text" style="font-size: 2.2rem; margin-bottom: 20px;">What did he do yesterday?</h3>
+            <img id="q-img" src="" class="question-img">
+            <div id="choices-container" class="choices-grid"></div>
+        </div>
+    </div>
+
+    <!-- Victory Screen -->
+    <div id="victory-screen" class="screen">
+        <div class="overlay"></div>
+        <div class="content">
+            <h1 id="winner-name">TEAM BLUE</h1>
+            <h2 style="font-size: 6rem; color: var(--gold); margin-bottom: 40px; text-shadow: 8px 8px 0 #000;">VICTORY!</h2>
+            <button class="btn btn-gold" onclick="startGame()">PLAY AGAIN</button>
+            <button class="btn" onclick="showScreen('home-screen')">BACK TO HOME</button>
+        </div>
+    </div>
+
+    <script>
+        // --- DATA ---
+        let questions = [];
+        function initQuestions() {
+            questions = [
+                { type: 'A', image: 'Art.png', q: "What is your favorite subject?", choices: ["Art", "Science", "Music", "PE"], correct: "Art" },
+                { type: 'A', image: 'Chinese.png', q: "What is your favorite subject?", choices: ["Math", "Science", "English", "Chinese"], correct: "Chinese" },
+                { type: 'A', image: 'English.png', q: "What is your favorite subject?", choices: ["Math", "Science", "English", "Chinese"], correct: "English" },
+                { type: 'A', image: 'Math.png', q: "What is your favorite subject?", choices: ["Math", "Science", "English", "Chinese"], correct: "Math" },
+                { type: 'A', image: 'Music.png', q: "What is your favorite subject?", choices: ["Art", "Science", "Music", "PE"], correct: "Music" },
+		{ type: 'A', image: 'PE.png', q: "What is your favorite subject?", choices: ["Art", "Science", "Music", "PE"], correct: "PE" },
+                { type: 'A', image: 'PE.png', q: "What is your favorite subject?", choices: ["Art", "Science", "Music", "PE"], correct: "Art" },
+                { type: 'B', q: "Which picture shows: Science?", choices: ["Science.png", "PE.png", "English.png", "Music.png"], correct: "Science.png" },
+                { type: 'B', q: "Which picture shows: PE?", choices: ["Science.png", "PE.png", "English.png", "Music.png"], correct: "PE.png" },
+                { type: 'B', q: "Which picture shows: English?", choices: ["Science.png", "PE.png", "English.png", "Music.png"], correct: "English.png" },
+                { type: 'B', q: "Which picture shows: Music?", choices: ["Science.png", "PE.png", "English.png", "Music.png"], correct: "Music.png" },
+                { type: 'B', q: "Which picture shows: Chinese?", choices: ["Science.png", "Chinese.png", "English.png", "computer.png"], correct: "Chinese.png" },
+                { type: 'B', q: "Which picture shows: Computer?", choices: ["Science.png", "Chinese.png", "English.png", "computer.png"], correct: "computer.png" },
+                { type: 'B', q: "Which picture shows: Art?", choices: ["SS.png", "Math.png", "PE.png", "Art.png"], correct: "Art.png" },
+                { type: 'B', q: "Which picture shows: Social Studies?", choices: ["SS.png", "Math.png", "PE.png", "Art.png"], correct: "SS.png" },
+                { type: 'C', q: "My favorite subject is _______.", clue: "SS.png", choices: ["Social Studies", "Math", "Chinese", "English"], correct: "Social Studies" },
+                { type: 'C', q: "My favorite subject is _______.", clue: "English.png", choices: ["Social Studies", "Math", "Chinese", "English"], correct: "English" },
+                { type: 'C', q: "My favorite subject is _______.", clue: "Chinese.png", choices: ["Social Studies", "Math", "Chinese", "English"], correct: "Chinese" },
+                { type: 'C', q: "My favorite subject is _______.", clue: "Math.png", choices: ["Social Studies", "Math", "Chinese", "English"], correct: "Math" },
+                { type: 'C', q: "My favorite subject is _______.", clue: "computer.png", choices: ["Science", "PE", "Social Studies", "Computer"], correct: "Computer" },
+                { type: 'C', q: "My favorite subject is _______.", clue: "PE.png", choices: ["Science", "PE", "Social Studies", "Computer"], correct: "PE" },
+                { type: 'C', q: "My favorite subject is _______.", clue: "Science.png", choices: ["Science", "PE", "Social Studies", "Computer"], correct: "Science" },
+                { type: 'C', q: "My favorite subject is _______.", clue: "SS.png", choices: ["Science", "PE", "Social Studies", "Computer"], correct: "Social Studies" },
+            ];
+            shuffle(questions);
+        }
+
+        // --- GAME STATE ---
+        let team1 = { name: "Team Blue", hp: 100, energy: 0, score: 0 };
+        let team2 = { name: "Team Red", hp: 100, energy: 0, score: 0 };
+        let currentTurn = 1; 
+        let currentSkill = null;
+        let qIndex = 0;
+        let isMuted = false;
+        let isFrozen = false; 
+
+        // --- UTILITIES ---
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+            playSfx('click');
+        }
+
+        function playSfx(id) {
+            if (isMuted) return;
+            const audio = document.getElementById('sfx-' + id);
+            if (audio) { audio.currentTime = 0; audio.play(); }
+        }
+
+        function toggleMute() {
+            isMuted = !isMuted;
+            const bg = document.getElementById('music-bg');
+            const btn = document.getElementById('mute-toggle');
+            if (isMuted) { bg.pause(); btn.innerText = "🔇 Sound: OFF"; }
+            else { bg.play().catch(() => {}); btn.innerText = "🔊 Sound: ON"; }
+        }
+
+        function shuffle(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
+
+        function saveTeams() {
+            team1.name = document.getElementById('t1-name-input').value || "Team Blue";
+            team2.name = document.getElementById('t2-name-input').value || "Team Red";
+            showScreen('home-screen');
+        }
+
+        // --- BATTLE LOGIC ---
+        function startGame() {
+            team1.hp = 100; team1.energy = 0; team1.score = 0;
+            team2.hp = 100; team2.energy = 0; team2.score = 0;
+            currentTurn = 1; qIndex = 0; isFrozen = false;
+            initQuestions();
+            updateUI();
+            showScreen('battle-screen');
+            announceTurn();
+            const bg = document.getElementById('music-bg');
+            if (!isMuted) bg.play().catch(() => {});
+        }
+
+        function announceTurn() {
+            const el = document.getElementById('turn-announcer');
+            const activeTeam = currentTurn === 1 ? team1 : team2;
+            el.innerText = `${activeTeam.name.toUpperCase()} TURN!`;
+            el.style.color = currentTurn === 1 ? 'var(--blue-team)' : 'var(--red-team)';
+            el.classList.remove('fade-in-out');
+            void el.offsetWidth; 
+            el.classList.add('fade-in-out');
+            
+            const ultBtn = document.getElementById('btn-ultimate');
+            if (activeTeam.energy >= 100) ultBtn.classList.remove('disabled');
+            else ultBtn.classList.add('disabled');
+            
+            document.getElementById('skills-menu').style.display = 'flex';
+            document.getElementById('question-overlay').style.display = 'none';
+        }
+
+        function selectSkill(skill) {
+            currentSkill = skill;
+            playSfx('click');
+            document.getElementById('skills-menu').style.display = 'none';
+            showQuestion();
+        }
+
+        function showQuestion() {
+            if (qIndex >= questions.length) { shuffle(questions); qIndex = 0; }
+            const q = questions[qIndex];
+            const overlay = document.getElementById('question-overlay');
+            const textEl = document.getElementById('q-text');
+            const imgEl = document.getElementById('q-img');
+            const choiceBox = document.getElementById('choices-container');
+
+            overlay.style.display = 'flex';
+            textEl.innerText = q.q;
+            imgEl.style.display = q.image || q.clue ? 'block' : 'none';
+            imgEl.src = q.image || q.clue || '';
+
+            choiceBox.innerHTML = '';
+            let currentChoices = [...q.choices];
+            shuffle(currentChoices);
+
+            currentChoices.forEach(choice => {
+                const btn = document.createElement('button');
+                btn.className = 'choice-btn';
+                if (q.type === 'B') {
+                    const img = document.createElement('img');
+                    img.src = choice;
+                    img.className = 'img-choice';
+                    btn.appendChild(img);
+                    btn.onclick = () => checkAnswer(choice, q.correct);
+                } else {
+                    btn.innerText = choice;
+                    btn.onclick = () => checkAnswer(choice, q.correct);
+                }
+                choiceBox.appendChild(btn);
+            });
+        }
+
+        function checkAnswer(chosen, correct) {
+            const overlay = document.getElementById('question-overlay');
+            const feedback = document.getElementById('feedback-text');
+            qIndex++;
+
+            overlay.style.display = 'none';
+            feedback.style.opacity = 1;
+
+            if (chosen === correct) {
+                playSfx('correct');
+                feedback.innerText = "CORRECT!";
+                feedback.style.color = "var(--gold)";
+                setTimeout(processAttack, 600);
+            } else {
+                playSfx('wrong');
+                feedback.innerText = "MISS!";
+                feedback.style.color = "#ccc";
+                setTimeout(() => {
+                    feedback.style.opacity = 0;
+                    endTurn();
+                }, 1200);
+            }
+        }
+
+        function processAttack() {
+            const attacker = currentTurn === 1 ? team1 : team2;
+            const defender = currentTurn === 1 ? team2 : team1;
+            const attackerWrap = document.getElementById(currentTurn === 1 ? 'hero-wrap-left' : 'hero-wrap-right');
+            const defenderImg = document.getElementById(currentTurn === 1 ? 'hero-right' : 'hero-left');
+            const feedback = document.getElementById('feedback-text');
+
+            let damage = 0;
+            let energyGain = 0;
+            let freezeSuccess = false;
+
+            switch(currentSkill) {
+                case 'quick':
+                    damage = Math.floor(Math.random() * (12 - 8 + 1)) + 8;
+                    energyGain = 15;
+                    playSfx('attack');
+                    break;
+                case 'power':
+                    damage = Math.floor(Math.random() * (20 - 14 + 1)) + 14;
+                    energyGain = 25;
+                    playSfx('attack');
+                    break;
+                case 'freeze':
+                    damage = Math.floor(Math.random() * (16 - 10 + 1)) + 10;
+                    energyGain = 20;
+                    if (Math.random() < 0.35) { freezeSuccess = true; playSfx('freeze'); }
+                    else { playSfx('attack'); }
+                    break;
+                case 'ultimate':
+                    damage = Math.floor(Math.random() * (35 - 24 + 1)) + 24;
+                    attacker.energy = 0;
+                    playSfx('ultimate');
+                    break;
+            }
+
+            // DASH ATTACK ANIMATION
+            attackerWrap.classList.add(currentTurn === 1 ? 'attack-left-dash' : 'attack-right-dash');
+            
+            setTimeout(() => {
+                // Return attacker and shake defender
+                attackerWrap.classList.remove('attack-left-dash', 'attack-right-dash');
+                defenderImg.classList.add('hit');
+                
+                defender.hp = Math.max(0, defender.hp - damage);
+                attacker.score += damage;
+                if (currentSkill !== 'ultimate') {
+                    attacker.energy = Math.min(100, attacker.energy + energyGain);
+                }
+                
+                if (freezeSuccess) {
+                    feedback.innerText = "FROZEN!";
+                    isFrozen = true;
+                }
+
+                updateUI();
+                
+                setTimeout(() => {
+                    defenderImg.classList.remove('hit');
+                    feedback.style.opacity = 0;
+                    if (defender.hp <= 0) { endGame(attacker.name); }
+                    else { endTurn(); }
+                }, 800);
+            }, 400);
+        }
+
+        function endTurn() {
+            if (isFrozen) { isFrozen = false; announceTurn(); }
+            else { currentTurn = currentTurn === 1 ? 2 : 1; announceTurn(); }
+        }
+
+        function updateUI() {
+            document.getElementById('t1-name-display').innerText = team1.name;
+            document.getElementById('t1-hp-bar').style.width = team1.hp + '%';
+            document.getElementById('t1-hp-val').innerText = team1.hp;
+            document.getElementById('t1-en-bar').style.width = team1.energy + '%';
+            document.getElementById('t1-en-val').innerText = team1.energy;
+            document.getElementById('t1-score').innerText = team1.score;
+
+            document.getElementById('t2-name-display').innerText = team2.name;
+            document.getElementById('t2-hp-bar').style.width = team2.hp + '%';
+            document.getElementById('t2-hp-val').innerText = team2.hp;
+            document.getElementById('t2-en-bar').style.width = team2.energy + '%';
+            document.getElementById('t2-en-val').innerText = team2.energy;
+            document.getElementById('t2-score').innerText = team2.score;
+        }
+
+        function endGame(winner) {
+            document.getElementById('winner-name').innerText = winner;
+            showScreen('victory-screen');
+            playSfx('victory');
+            document.getElementById('music-bg').pause();
+        }
+
+        window.onload = () => { initQuestions(); };
+    </script>
+</body>
+</html>
