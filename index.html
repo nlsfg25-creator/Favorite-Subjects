@@ -280,7 +280,10 @@
         .volume-control {
             position: absolute;
             top: 25px;
-            right: 25px;
+            /* Move to the horizontal center */
+            left: 50%;
+            /* Offset the button by half its own width to center it perfectly */
+            transform: translateX(-50%);
             z-index: 1000;
         }
     </style>
